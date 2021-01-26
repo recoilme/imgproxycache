@@ -34,15 +34,6 @@ func TestImgLoad(t *testing.T) {
 	fmt.Println(h)
 }
 
-/*
-func TestResize(t *testing.T) {
-	bin, err := imgLoad("https://www.barnorama.com/wp-content/uploads/2018/11/Jennifer-Lawrence-Is-Sexy-50.jpg")
-	assert.NoError(t, err)
-	assert.NotEqual(t, 0, len(bin))
-	h, err := cachePut(img3, bin)
-	resize(h)
-}
-*/
 func TestCachePut(t *testing.T) {
 	someString := "any"
 	buf := make([]byte, 1)
@@ -115,3 +106,56 @@ func TestMainHandler(t *testing.T) {
 	cacheDelWithDirs(href, true)
 	assert.NoError(t, err)
 }
+
+/*
+func TestResize(t *testing.T) {
+	bin, err := imgLoad("https://www.barnorama.com/wp-content/uploads/2018/11/Jennifer-Lawrence-Is-Sexy-50.jpg")
+	assert.NoError(t, err)
+	assert.NotEqual(t, 0, len(bin))
+	h, err := cachePut(img3, bin)
+	resize(h)
+}
+*/
+
+/*
+//PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig"   CGO_LDFLAGS_ALLOW="-s|-w"   CGO_CFLAGS_ALLOW="-Xpreprocessor" go build
+func resize(s string) error {
+	w := 776
+	h := 416
+	options := bimg.Options{
+		Width:     w,
+		Height:    h,
+		Crop:      true,
+		Quality:   95,
+		Gravity:   bimg.GravitySmart,
+		Interlace: true,
+	}
+
+	filePath, err := cacheFilePath(s)
+	if err != nil {
+		return err
+	}
+
+	buffer, err := bimg.Read(filePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+
+	newImage, err := bimg.NewImage(buffer).Process(options)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+
+	bimg.Write("new.jpg", newImage)
+
+	options.Gravity = bimg.GravityCentre
+	newImage, err = bimg.NewImage(buffer).Process(options)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+
+	bimg.Write("new2.jpg", newImage)
+
+	return nil
+}
+*/

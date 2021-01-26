@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
+	"flag"
 	"html"
+	"reflect"
+	"sync/atomic"
 
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -19,23 +22,27 @@ import (
 )
 
 var (
+	//errors
 	errURLLoad    = "Error: load url"
 	errCacheShort = "Error: hash to short"
+	// metrics
+	reqSuccess uint64
+	reqError   uint64
+	//params
+	address = flag.String("address", ":8081", "address to listen on (default: :8081)")
 )
 
 func main() {
 	// config load
-	address := ":8081"
+	flag.Parse()
 
 	// signal check
 	quit := make(chan os.Signal, 1)
 	graceful.Unignore(quit, fallback, graceful.Terminate...)
-	// metrics
 
 	// service
 	http.HandleFunc("/", mainPage)
-
-	log.Fatal(http.ListenAndServe(address, nil))
+	fmt.Println(http.ListenAndServe(*address, nil))
 }
 
 func fallback() error {
@@ -46,7 +53,7 @@ func fallback() error {
 
 // imgLoad load image data
 func imgLoad(imgURL string) ([]byte, error) {
-	log.Println("imgLoad", imgURL)
+	log("imgLoad", imgURL)
 	ctx, cncl := context.WithTimeout(context.Background(), time.Second*10)
 	defer cncl()
 
@@ -58,7 +65,7 @@ func imgLoad(imgURL string) ([]byte, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Println(err, imgURL)
+		log(err, imgURL)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -95,7 +102,7 @@ func hash(s string) string {
 //c/29/b7f54b2df7773722d382f4809d650
 // return hash, error
 func cachePut(imgURL string, imgData []byte) (string, error) {
-	log.Println("cachePut", imgURL)
+	log("cachePut", imgURL)
 	hash := hash(imgURL)
 	err := cacheMkDirs(hash)
 	if err != nil {
@@ -130,49 +137,6 @@ func cacheFilePath(hash string) (string, error) {
 	return fmt.Sprintf("%s/%s/%s", string(hash[0]), string(hash[1:3]), string(hash[4:])), nil
 }
 
-/*
-//PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig"   CGO_LDFLAGS_ALLOW="-s|-w"   CGO_CFLAGS_ALLOW="-Xpreprocessor" go build
-func resize(s string) error {
-	w := 776
-	h := 416
-	options := bimg.Options{
-		Width:     w,
-		Height:    h,
-		Crop:      true,
-		Quality:   95,
-		Gravity:   bimg.GravitySmart,
-		Interlace: true,
-	}
-
-	filePath, err := cacheFilePath(s)
-	if err != nil {
-		return err
-	}
-
-	buffer, err := bimg.Read(filePath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-
-	newImage, err := bimg.NewImage(buffer).Process(options)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-
-	bimg.Write("new.jpg", newImage)
-
-	options.Gravity = bimg.GravityCentre
-	newImage, err = bimg.NewImage(buffer).Process(options)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-
-	bimg.Write("new2.jpg", newImage)
-
-	return nil
-}
-*/
-
 // cacheDelWithDirs delete cache file
 // if withDirs==true - remove dirs if not empty
 func cacheDelWithDirs(s string, withDirs bool) error {
@@ -198,7 +162,7 @@ func cacheDelWithDirs(s string, withDirs bool) error {
 // cacheGet - convert string to hash, to hashPath and read
 // return error if any
 func cacheGet(imgURL string) ([]byte, error) {
-	log.Println("cacheGet", imgURL)
+	log("cacheGet", imgURL)
 	hash := hash(imgURL)
 	filePath, err := cacheFilePath(hash)
 	if err != nil {
@@ -210,7 +174,7 @@ func cacheGet(imgURL string) ([]byte, error) {
 //mainPage handler
 func mainPage(w http.ResponseWriter, r *http.Request) {
 	path := html.EscapeString(r.URL.Path)
-	log.Println("mainPage", path)
+	log("mainPage", path)
 	switch r.Method {
 	case "GET":
 		vals := r.URL.Query()
@@ -222,6 +186,7 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 
 		bin, err := urlGet(url)
 		if err != nil {
+			atomic.AddUint64(&reqError, 1)
 			w.WriteHeader(404)
 			return
 		}
@@ -230,22 +195,26 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 		cntType := strings.ToLower(http.DetectContentType(buf))
 		if !strings.HasPrefix(cntType, "image") {
 			w.WriteHeader(404)
+			atomic.AddUint64(&reqError, 1)
 			return
 		}
 		w.Header().Set("Content-Type", cntType)
+		atomic.AddUint64(&reqSuccess, 1)
 		w.Write(bin)
+		return
 	default:
 		w.WriteHeader(503)
+		return
 	}
 }
 
 // urlGet - check cache, load and put in cache if not
 func urlGet(imgURL string) ([]byte, error) {
-	log.Println("urlGet", imgURL)
+	log("urlGet", imgURL)
 	// check cache
 	bin, err := cacheGet(imgURL)
 	if err == nil {
-		log.Println("get from cache", imgURL)
+		log("get from cache", imgURL)
 		return bin, err
 	}
 	// load
@@ -259,4 +228,21 @@ func urlGet(imgURL string) ([]byte, error) {
 		return nil, err
 	}
 	return bin, nil
+}
+
+func log(a ...interface{}) (n int, err error) {
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("%s ", time.Now().Format("15:04:05")))
+	isError := false
+	for _, s := range a {
+		buf.WriteString(fmt.Sprint(s, " "))
+		if strings.HasPrefix(reflect.TypeOf(a).String(), "*error") {
+			isError = true
+		}
+	}
+	if isError /*&& graylog != nil*/ {
+		//graylog.Error(buf.String())
+		//fmt.Println(os.Stderr, buf.String())
+	}
+	return fmt.Fprintln(os.Stdout, buf.String())
 }
