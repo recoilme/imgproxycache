@@ -1,13 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/muesli/smartcrop"
+	"github.com/muesli/smartcrop/nfnt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -107,17 +112,42 @@ func TestMainHandler(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSc(t *testing.T) {
+	type SubImager interface {
+		SubImage(r image.Rectangle) image.Image
+	}
+	w := 776
+	h := 620 //416
+	imgURL := "https://github.com/muesli/smartcrop-samples/blob/master/muesli/guitarist.jpg?raw=true"
+	//"https://i.trbna.com/preset/wysiwyg/2/61/0e0984cf811eb927ad03e1d88bea4.jpeg"
+	bin, err := urlGet(imgURL)
+	assert.NoError(t, err)
+	assert.NotNil(t, bin)
+	analyzer := smartcrop.NewAnalyzer(nfnt.NewDefaultResizer())
+	img, _, err := image.Decode(bytes.NewReader(bin))
+	assert.NoError(t, err)
+	rect, err := analyzer.FindBestCrop(img, w, h)
+	assert.NoError(t, err)
+
+	sub, ok := img.(SubImager)
+	if ok {
+		cropImage := sub.SubImage(rect)
+		// cropImage := sub.SubImage(image.Rect(topCrop.X, topCrop.Y, topCrop.Width+topCrop.X, topCrop.Height+topCrop.Y))
+		smartcrop.WriteImage("jpeg", cropImage, "./smartcrop.jpg")
+	} else {
+		t.Error(errors.New("No SubImage support"))
+	}
+}
+
 /*
 func TestResize(t *testing.T) {
-	bin, err := imgLoad("https://www.barnorama.com/wp-content/uploads/2018/11/Jennifer-Lawrence-Is-Sexy-50.jpg")
+	bin, err := imgLoad("https://i.trbna.com/preset/wysiwyg/2/61/0e0984cf811eb927ad03e1d88bea4.jpeg")
 	assert.NoError(t, err)
 	assert.NotEqual(t, 0, len(bin))
 	h, err := cachePut(img3, bin)
 	resize(h)
 }
-*/
 
-/*
 //PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig"   CGO_LDFLAGS_ALLOW="-s|-w"   CGO_CFLAGS_ALLOW="-Xpreprocessor" go build
 func resize(s string) error {
 	w := 776
