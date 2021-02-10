@@ -112,6 +112,7 @@ func TestMainHandler(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+//https://29a.ch/sandbox/2014/smartcrop/examples/testbed.html
 func TestSc(t *testing.T) {
 	type SubImager interface {
 		SubImage(r image.Rectangle) image.Image
