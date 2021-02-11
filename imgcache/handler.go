@@ -18,7 +18,7 @@ func ImgHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Fprintf(w, "<h1>Hello world, url = "+url+"</h1>")
+		fmt.Fprintf(w, "<h1>Hello, url = "+url+"</h1>")
 
 		return
 	default:
