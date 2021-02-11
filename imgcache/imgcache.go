@@ -7,9 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -181,4 +185,39 @@ func cacheDelWithDirs(s string, withDirs bool) error {
 	}
 	err = os.Remove(filePath[:2]) // remove dir /s
 	return err
+}
+
+func writeImage(imgtype string, img image.Image, name string) error {
+	if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+		panic(err)
+	}
+
+	switch imgtype {
+	case "png":
+		return writeImageToPng(img, name)
+	case "jpeg":
+		return writeImageToJpeg(img, name)
+	}
+
+	return errors.New("Unknown image type")
+}
+
+func writeImageToJpeg(img image.Image, name string) error {
+	fso, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	defer fso.Close()
+
+	return jpeg.Encode(fso, img, &jpeg.Options{Quality: 100})
+}
+
+func writeImageToPng(img image.Image, name string) error {
+	fso, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	defer fso.Close()
+
+	return png.Encode(fso, img)
 }

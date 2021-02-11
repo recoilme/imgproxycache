@@ -134,7 +134,7 @@ func TestSc(t *testing.T) {
 	if ok {
 		cropImage := sub.SubImage(rect)
 		// cropImage := sub.SubImage(image.Rect(topCrop.X, topCrop.Y, topCrop.Width+topCrop.X, topCrop.Height+topCrop.Y))
-		smartcrop.WriteImage("jpeg", cropImage, "./smartcrop.jpg")
+		writeImage("jpeg", cropImage, "./smartcrop.jpg")
 	} else {
 		t.Error(errors.New("No SubImage support"))
 	}

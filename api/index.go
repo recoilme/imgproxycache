@@ -7,6 +7,5 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	//Img(w, r)
 	imgcache.MainPage(w, r)
 }
