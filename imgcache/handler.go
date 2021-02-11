@@ -51,6 +51,7 @@ func MainPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// MainPageNoCache - load image on the fly
 func MainPageNoCache(w http.ResponseWriter, r *http.Request) {
 	path := html.EscapeString(r.URL.Path)
 	log("mainPage", path)
@@ -63,9 +64,9 @@ func MainPageNoCache(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		bin, err := urlGet(url)
+		bin, err := imgLoad(url)
 		if err != nil {
-			log("urlGet err", err)
+			log("imgLoad err", err)
 			atomic.AddUint64(&reqError, 1)
 			w.WriteHeader(404)
 			return
